@@ -1,6 +1,10 @@
-from fastapi import FastAPI
+import json
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import PlainTextResponse
 from models import Book
 from pydantic import BaseModel
+from starlette.responses import JSONResponse
 
 
 class BookResponse(BaseModel):
@@ -9,6 +13,14 @@ class BookResponse(BaseModel):
 
 
 app = FastAPI()
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return PlainTextResponse(
+        "This is a plain text response:" f" \n{json.dumps(exc.errors(), indent=2)}",
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
 
 
 @app.get("/allbooks")
@@ -47,3 +59,8 @@ async def read_book(book_id: int):
         "title": "The Great Gatsby",
         "author": "F. Scott Fitzgerald",
     }
+
+
+@app.get("/error_endpoint")
+async def raise_exception():
+    raise HTTPException(status_code=400)

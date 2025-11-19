@@ -1,14 +1,32 @@
 from bson import ObjectId
 from database import user_collection
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator
 
 app = FastAPI()
 
 
+class Tweet(BaseModel):
+    content: str
+    hashtags: list[str]
+
+
 class User(BaseModel):
     name: str
-    email: str
+    email: EmailStr
+    age: int
+    tweets: list[Tweet] | None = None
+
+    @field_validator("age")
+    def validate_age(cls, value):
+        if value < 18 or value > 100:
+            raise ValueError("Age must be between 18 and 100")
+        return value
+
+
+class UserCreate(BaseModel):
+    name: str
+    email: EmailStr
 
 
 class UserResponse(User):
@@ -27,7 +45,7 @@ def get_user(user_id: str):
 
 
 @app.post("/user")
-def create_user(user: User):
+def create_user(user: UserCreate):
     result = user_collection.insert_one(user.model_dump(exclude_none=True))
     user_response = UserResponse(id=str(result.inserted_id), **user.model_dump())
     return user_response

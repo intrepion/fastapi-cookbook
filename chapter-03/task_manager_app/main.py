@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from models import (
     Task,
     TaskV2WithID,
@@ -13,6 +14,14 @@ from operations import (
     remove_task,
 )
 from pydantic import BaseModel
+from security import (
+    User,
+    UserInDB,
+    fake_token_generator,
+    fakely_hash_password,
+    fake_users_db,
+    get_user_from_token,
+)
 from typing import Optional
 
 
@@ -79,6 +88,34 @@ def search_tasks(keyword: str):
         if keyword.lower() in (task.title + task.description).lower()
     ]
     return filtered_tasks
+
+
+@app.post("/token")
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+):
+    user_dict = fake_users_db.get(form_data.username)
+    if not user_dict:
+        raise HTTPException(
+            status_code=400,
+            detail="Incorrect username or password",
+        )
+    user = UserInDB(**user_dict)
+    hashed_password = fakely_hash_password(form_data.password)
+    if not hashed_password == user.hashed_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Incorrect username or password",
+        )
+    token = fake_token_generator(user)
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@app.get("/users/me", response_model=User)
+def read_users_me(
+    current_user: User = Depends(get_user_from_token),
+):
+    return current_user
 
 
 @app.get("/v2/tasks", response_model=list[TaskV2WithID])
